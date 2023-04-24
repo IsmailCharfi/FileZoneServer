@@ -12,14 +12,15 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
+app.config['KERBEROS_REALM'] = 'FILEZONE.COM'
+app.config['KERBEROS_KEYTAB'] = '/etc/krb5.keytab'
+app.config['KERBEROS_SERVICE_NAME'] = 'HTTP'
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'file_zone.sqlite')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///{}'.format(db_path)
 db = SQLAlchemy(app)
-
-init_kerberos(app)
-
 
 class StorableType(enum.Enum):
     DIRECTORY = 1
@@ -142,6 +143,7 @@ def sing_up():
 
 
 @app.route('/<int:_id>/add-file', methods=["POST"])
+@requires_authentication
 def add_file(_id):
     folder = Storable.query.filter_by(id=_id).first()
 
@@ -169,6 +171,7 @@ def add_file(_id):
 
 
 @app.route('/<int:_id>/add-folder', methods=["POST"])
+@requires_authentication
 def add_folder(_id):
     folder = Storable.query.filter_by(id=_id).first()
 
@@ -192,6 +195,7 @@ def add_folder(_id):
 
 
 @app.route('/users/<int:_id>/root', methods=["GET"])
+@requires_authentication
 def get_root(_id):
     user = User.query.filter_by(id=_id).first()
 
@@ -202,6 +206,7 @@ def get_root(_id):
 
 
 @app.route('/<int:_id>', methods=["DELETE"])
+@requires_authentication
 def delete_storable(_id):
     storable = Storable.query.filter_by(id=_id).first()
 
@@ -221,6 +226,7 @@ def delete_storable(_id):
 
 
 @app.route('/<int:_id>/content', methods=["GET"])
+@requires_authentication
 def download(_id):
     storable = Storable.query.filter_by(id=_id).first()
 
@@ -231,4 +237,5 @@ def download(_id):
 
 
 if __name__ == '__main__':
-    app.run(host="filezone.com", debug=True, ssl_context=('./certificate.crt', './private.key'))
+    init_kerberos(app, service='host', hostname='server.filezone.com')
+    app.run(host="0.0.0.0", debug=True, ssl_context=('./certificate.crt', './private.key'))
